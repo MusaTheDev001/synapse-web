@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { OriginBadge, SigningOriginNote } from "./OriginBadge";
@@ -89,5 +90,61 @@ describe("SigningOriginNote", () => {
   it("shows the loud label and hint for a framed origin", () => {
     render(<SigningOriginNote state={state({ classification: "framed", framed: true })} />);
     expect(screen.getByText(/EMBEDDED · DO NOT SIGN/)).toBeInTheDocument();
+  });
+
+  it("renders the muted confirmation message for genuine origin", () => {
+    render(<SigningOriginNote state={state({ classification: "genuine" })} />);
+    const note = screen.getByText(/Signing on https:\/\/synapse\.example\.com/i);
+    expect(note).toBeDefined();
+    expect(note.textContent).toMatch(/confirm this host against the address bar/i);
+  });
+
+  it("renders the muted confirmation message for dev origin", () => {
+    render(<SigningOriginNote state={state({ classification: "dev", hostname: "localhost", origin: "http://localhost:3000" })} />);
+    const note = screen.getByText(/Signing on http:\/\/localhost:3000/i);
+    expect(note).toBeDefined();
+  });
+
+  it("renders the loud warning for unknown origin", () => {
+    render(<SigningOriginNote state={state({ classification: "unknown", hostname: "evil.example.com" })} />);
+    const note = screen.getByText(/UNVERIFIED ORIGIN/i);
+    expect(note).toBeDefined();
+    expect(note.textContent).toMatch(/Check the address bar/i);
+  });
+
+  it("renders the loudest warning for framed origin", () => {
+    render(<SigningOriginNote state={state({ classification: "framed", hostname: "synapse.example.com" })} />);
+    const note = screen.getByText(/EMBEDDED · DO NOT SIGN/i);
+    expect(note).toBeDefined();
+    expect(note.textContent).toMatch(/running inside another page/i);
+  });
+
+  it("sets data-origin-classification=genuine for genuine state", () => {
+    const { container } = render(<SigningOriginNote state={state({ classification: "genuine" })} />);
+    const div = container.querySelector("[data-origin-classification]");
+    expect(div?.getAttribute("data-origin-classification")).toBe("genuine");
+  });
+
+  it("sets data-origin-classification=unknown for unknown state", () => {
+    const { container } = render(
+      <SigningOriginNote state={state({ classification: "unknown", hostname: "evil.example.com" })} />
+    );
+    const div = container.querySelector("[data-origin-classification]");
+    expect(div?.getAttribute("data-origin-classification")).toBe("unknown");
+  });
+
+  it("genuine note does not show the UNVERIFIED label", () => {
+    render(<SigningOriginNote state={state({ classification: "genuine" })} />);
+    expect(screen.queryByText(/UNVERIFIED ORIGIN/i)).toBeNull();
+    expect(screen.queryByText(/EMBEDDED/i)).toBeNull();
+  });
+
+  it("unknown note shows the full label+hint inline (not the muted format)", () => {
+    render(
+      <SigningOriginNote state={state({ classification: "unknown", hostname: "attacker.io", origin: "https://attacker.io" })} />
+    );
+    // The muted "Signing on <origin>" copy only appears for genuine/dev.
+    const note = screen.getByText(/UNVERIFIED ORIGIN/i);
+    expect(note.textContent).not.toMatch(/^Signing on /);
   });
 });
